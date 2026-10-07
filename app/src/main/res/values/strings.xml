@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Brahmandd 4D</string>
+    <string name="wallpaper_description">High-performance adaptive 4D live wallpaper ecosystem</string>
+    <string name="remote_wallpaper_catalog_url" translatable="false">https://nishan961.github.io/brahmandd-wallpapers/catalog.json</string>
+</resources>
