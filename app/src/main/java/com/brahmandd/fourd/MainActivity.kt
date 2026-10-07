@@ -81,9 +81,11 @@ class MainActivity : ComponentActivity() {
         Thread {
             try {
                 val wallpapers = RemoteWallpaperCatalog.fetch(catalogUrl)
-                val assets = wallpapers.mapNotNull { wallpaper ->
+                val thumbnails = wallpapers.mapNotNull { wallpaper ->
                     try {
-                        wallpaper.id to RemoteWallpaperCatalog.cacheWallpaper(this, wallpaper)
+                        RemoteWallpaperCatalog.cacheWallpaper(this, wallpaper)
+                        RemoteWallpaperCatalog.loadCachedThumbnail(this, wallpaper.id)
+                            ?.let { wallpaper.id to it }
                     } catch (error: IOException) {
                         Log.e(TAG, "Unable to cache remote wallpaper '${wallpaper.id}'.", error)
                         null
@@ -92,8 +94,8 @@ class MainActivity : ComponentActivity() {
 
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
-                        remoteWallpapers = wallpapers.filter { it.id in assets }
-                        remoteWallpaperImages = assets.mapValues { (_, wallpaperAssets) -> wallpaperAssets.image }
+                        remoteWallpapers = wallpapers.filter { it.id in thumbnails }
+                        remoteWallpaperImages = thumbnails
                         if (selectedRemoteWallpaperId !in remoteWallpapers.map { it.id }) {
                             selectedRemoteWallpaperId = null
                             wallpaperStateManager.selectedRemoteWallpaperId = null

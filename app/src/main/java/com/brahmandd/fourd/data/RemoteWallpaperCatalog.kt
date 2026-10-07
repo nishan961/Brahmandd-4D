@@ -35,7 +35,8 @@ data class RemoteWallpaperAssets(
 object RemoteWallpaperCatalog {
     private const val CONNECT_TIMEOUT_MILLIS = 10_000
     private const val READ_TIMEOUT_MILLIS = 10_000
-    private const val MAX_IMAGE_DIMENSION = 512
+    private const val MAX_THUMBNAIL_IMAGE_DIMENSION = 512
+    private const val MAX_RENDER_IMAGE_DIMENSION = 1440
     private const val MAX_DOWNLOAD_BYTES = 30L * 1024L * 1024L
     private const val CACHE_DIRECTORY = "remote_wallpapers"
     private const val TAG = "RemoteWallpaperCatalog"
@@ -79,7 +80,7 @@ object RemoteWallpaperCatalog {
         }
     }
 
-    fun cacheWallpaper(context: Context, wallpaper: RemoteWallpaper): RemoteWallpaperAssets {
+    fun cacheWallpaper(context: Context, wallpaper: RemoteWallpaper) {
         val directory = wallpaperDirectory(context, wallpaper.id)
         if (!directory.exists() && !directory.mkdirs()) {
             throw IOException("Unable to create the remote wallpaper cache.")
@@ -89,10 +90,6 @@ object RemoteWallpaperCatalog {
         val depthFile = File(directory, "depth")
         refreshCachedFile(wallpaper.imageUrl, imageFile)
         refreshCachedFile(wallpaper.depthUrl, depthFile)
-        return RemoteWallpaperAssets(
-            image = decodeCachedBitmap(imageFile),
-            depth = decodeCachedBitmap(depthFile),
-        )
     }
 
     fun loadCached(context: Context, wallpaperId: String): RemoteWallpaperAssets? {
@@ -101,12 +98,18 @@ object RemoteWallpaperCatalog {
         val depthFile = File(directory, "depth")
         if (!imageFile.isFile || !depthFile.isFile) return null
         return RemoteWallpaperAssets(
-            image = decodeCachedBitmap(imageFile),
-            depth = decodeCachedBitmap(depthFile),
+            image = decodeCachedBitmap(imageFile, MAX_RENDER_IMAGE_DIMENSION),
+            depth = decodeCachedBitmap(depthFile, MAX_RENDER_IMAGE_DIMENSION),
         )
     }
 
-    private fun decodeCachedBitmap(file: File): Bitmap {
+    fun loadCachedThumbnail(context: Context, wallpaperId: String): Bitmap? {
+        val imageFile = File(wallpaperDirectory(context, wallpaperId), "image")
+        if (!imageFile.isFile) return null
+        return decodeCachedBitmap(imageFile, MAX_THUMBNAIL_IMAGE_DIMENSION)
+    }
+
+    private fun decodeCachedBitmap(file: File, maxDimension: Int): Bitmap {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
@@ -114,7 +117,7 @@ object RemoteWallpaperCatalog {
         }
 
         val options = BitmapFactory.Options().apply {
-            inSampleSize = calculateSampleSize(bounds.outWidth, bounds.outHeight)
+            inSampleSize = calculateSampleSize(bounds.outWidth, bounds.outHeight, maxDimension)
         }
         return BitmapFactory.decodeFile(file.absolutePath, options)
             ?: throw IOException("Unable to decode a cached remote wallpaper image.")
@@ -206,9 +209,9 @@ object RemoteWallpaperCatalog {
         } ?: throw IOException("Unable to open the remote wallpaper URL.")
     }
 
-    private fun calculateSampleSize(width: Int, height: Int): Int {
+    private fun calculateSampleSize(width: Int, height: Int, maxDimension: Int): Int {
         var sampleSize = 1
-        while (max(width / sampleSize, height / sampleSize) > MAX_IMAGE_DIMENSION) {
+        while (max(width / sampleSize, height / sampleSize) > maxDimension) {
             sampleSize *= 2
         }
         return sampleSize
